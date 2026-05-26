@@ -18,7 +18,7 @@ async function init() {
   // initialize ServiceWorker
   initializeServiceWorker();
   // Get the recipes from localStorage
-  let recipes;
+  let recipes = [];
   try {
     recipes = await getRecipes();
   } catch (err) {
@@ -54,8 +54,17 @@ function initializeServiceWorker() {
   // B5. TODO - In the event that the service worker registration fails, console
   //            log that it has failed.
   // STEPS B6 ONWARDS WILL BE IN /sw.js
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', async() => {
+      try{
+        const registration = await navigator.serviceWorker.register('./sw.js');
+        console.log('ServiceWorker registration successful:',registration);
+      } catch(err){
+        console.log('ServiceWorker registration failed:',err);
+      }
+    });
+  }
 }
-
 /**
  * Reads 'recipes' from localStorage and returns an array of
  * all of the recipes found (parsed, not in string form). If
@@ -100,6 +109,31 @@ async function getRecipes() {
   //            resolve() method.
   // A10. TODO - Log any errors from catch using console.error
   // A11. TODO - Pass any errors to the Promise's reject() function
+  // A1. Check localStorage to see if there are any recipes.
+  const Recipes = localStorage.getItem('recipes');
+  if (Recipes) {
+    return JSON.parse(Recipes);
+  }
+  const recipes = [];
+  return new Promise(async (resolve, reject) => {
+    for (const url of RECIPE_URLS) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        const recipe = await response.json();
+        recipes.push(recipe);
+        if (recipes.length === RECIPE_URLS.length) {
+          saveRecipesToStorage(recipes);
+          resolve(recipes);
+        }
+      } catch (err) {
+        console.error(err);
+        reject(err);
+      }
+    }
+  });
 }
 
 /**
